@@ -1,9 +1,20 @@
 #include "Matrix.h"
+#include <string.h> 
+
+struct RowColumnMultiplicationArgs
+{
+	Matrix* A;
+	Matrix* B;
+	int ColumnIndex;
+	int RowIndex;
+	float* Result;
+};
+
 
 Matrix* Matrix_new()
 {
 	Matrix* matrix = (Matrix*)malloc(sizeof(Matrix));
-	matrix->data = (float**)malloc(0, sizeof(float*));
+	matrix->data = (float**)calloc(0, sizeof(float*));
 	matrix->columnsAmount = 0;
 	matrix->rowsAmount = 0;
 
@@ -23,13 +34,14 @@ void Matrix_destroy(Matrix* matrix)
 	pthread_mutex_destroy(&matrix->mutex);
 
 	free(matrix);
+	return;
 }
 
 void AddColumns(Matrix* matrix, int amount)
 {
 	if (amount < 1)
 	{
-		printf("AddColumns error: Amount must be greater then 0\n");
+		printf("AddColumns error: Amount of columns to add must be greater then 0\n");
 		return;
 	}
 
@@ -60,23 +72,107 @@ void AddColumns(Matrix* matrix, int amount)
 	pthread_mutex_unlock(&matrix->mutex);
 }
 
+void SetElement(Matrix* matrix, int rowInd, int columnInd, float value)
+{
+	if (rowInd >= matrix->rowsAmount)
+	{
+		printf("SetElement error: Row index is out of range\n");
+		return;
+	}
+	if (columnInd >= matrix->columnsAmount)
+	{
+		printf("SetElement error: Row index is out of range\n");
+		return;
+	}
+	matrix->data[rowInd][columnInd] = value;
+}
+
+float GetElement(Matrix* matrix, int rowInd, int columnInd)
+{
+	if (rowInd >= matrix->rowsAmount)
+	{
+		printf("SetElement error: Row index is out of range\n");
+		return;
+	}
+	if (columnInd >= matrix->columnsAmount)
+	{
+		printf("SetElement error: Row index is out of range\n");
+		return;
+	}
+	return matrix->data[rowInd][columnInd];
+}
+
+void GetMatrixSize(Matrix* matrix, int* rows, int* columns)
+{
+	*rows = matrix->rowsAmount;
+	*columns = matrix->columnsAmount;
+}
+
 void PrintfMatrix(Matrix* matrix)
 {
 	for (size_t i = 0; i < matrix->rowsAmount; i++)
 	{
 		for (size_t j = 0; j < matrix->columnsAmount; j++)
 		{
-			printf("%3f ", matrix->data[i][j]);
+			printf("%9.4f ", matrix->data[i][j]);
 		}
 		printf("\n");
 	}
+}
+
+//Use only in MatrixMultiplication function
+void* RowColumnMultiplication(void* ArgStruct)
+{
+	struct RowColumnMultiplicationArgs* pars = (struct RowColumnMultiplicationArgs*)ArgStruct;
+	for (size_t i = 0; i < pars->B->rowsAmount; i++)
+	{
+		*pars->Result += GetElement(pars->A, pars->RowIndex, i) * GetElement(pars->B, i, pars->ColumnIndex);
+	}
+	pthread_exit(0);
+}
+
+Matrix* MatrixMultiplication(Matrix* matrixA, Matrix* matrixB)
+{
+	Matrix* matrixC = Matrix_new();
+	AddColumns(matrixC, matrixB->columnsAmount);
+	AddRows(matrixC, matrixA->rowsAmount);
+
+	if (matrixB->rowsAmount != matrixA->columnsAmount)
+	{
+		printf("MatrixMultiplication error:	Matrices are incompatible for multiplication");
+		return NULL;
+	}
+
+	pthread_t* thread = calloc(matrixA->rowsAmount* matrixB->columnsAmount, sizeof(pthread_t));
+
+	for (size_t i = 0; i < matrixA->rowsAmount; i++)
+	{
+		for (int j = 0; j < matrixB->columnsAmount; j++)
+		{
+			struct RowColumnMultiplicationArgs* par = (struct RowColumnMultiplicationArgs*)malloc(sizeof(struct RowColumnMultiplicationArgs));
+			par->A = matrixA;
+			par->B = matrixB;
+			par->ColumnIndex = j;
+			par->RowIndex = i;
+			par->Result = &matrixC->data[i][j];
+
+			pthread_create(&thread[i* matrixA->rowsAmount + j], NULL, &RowColumnMultiplication, (void*)par);
+		}
+	}
+
+	for (size_t i = 0; i < matrixA->rowsAmount* matrixB->columnsAmount; i++)
+	{
+		pthread_join(thread[i], NULL);
+	}
+	
+	return matrixC;
 }
 
 void AddRows(Matrix* matrix, int amount)
 {
 	if (amount < 1)
 	{
-		printf("AddRows error: Amount must be greater then 0\n");
+		printf("AddRows error: Amount of rows to add must be greater then 0\n");
 		return;
 	}
 

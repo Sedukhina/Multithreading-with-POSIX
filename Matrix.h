@@ -12,9 +12,17 @@ typedef struct
 } Matrix;
 
 extern Matrix* Matrix_new();
+//TO DO:
+//extern Matrix* Array2DToMatrix(float** array, int rows, int columns);
 extern void Matrix_destroy(Matrix* matrix);
 
 extern void AddRows(Matrix* matrix, int amount);
 extern void AddColumns(Matrix* matrix, int amount);
+extern void SetElement(Matrix* matrix, int rowInd, int columnInd, float value);
+
+extern float GetElement(Matrix* matrix, int rowInd, int columnInd);
+extern void GetMatrixSize(Matrix* matrix, int* row, int* column);
 
 extern void PrintfMatrix(Matrix* matrix);
+
+extern Matrix* MatrixMultiplication(const Matrix* matrixA, const Matrix* matrixB);
